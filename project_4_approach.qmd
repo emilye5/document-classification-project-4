@@ -1,0 +1,9 @@
+---
+title: "Project 4"
+author: "Emily El Mouaquite"
+format: html
+editor: visual
+---
+
+## Approach
+For this assignment, I will use the [Ling-Spam Dataset](https://www.kaggle.com/datasets/mandygu/lingspam-dataset), which contains spam and ham messages from [The Lingust List](https://linguistlist.org/). Since the dataset is already clean and available on Kaggle, I can focus on training a model to classify emails as spam or ham. I will then test the model on new emails to evaluate how accurate it is.
