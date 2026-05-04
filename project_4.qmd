@@ -1,0 +1,120 @@
+---
+title: "Project 4: Predicting Ham vs Spam Emails"
+author: "Emily El Mouaquite"
+format: html
+editor: visual
+---
+
+## Approach
+
+For this assignment, I will use the [Ling-Spam Dataset](https://www.kaggle.com/datasets/mandygu/lingspam-dataset), which contains spam and ham messages from [The Lingust List](https://linguistlist.org/). Since the dataset is already clean and available on Kaggle, I can focus on training a model to classify emails as spam or ham. I will then test the model on new emails to evaluate how accurate it is.
+
+## Code Base
+
+Loading the data and necessary packages:
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(textrecipes)
+library(discrim)
+library(naivebayes)
+emails <- read.csv("messages.csv")
+head(emails)
+#change label column to factors from integer vectors
+emails <- emails %>%
+  mutate(label = as.factor(label))
+```
+
+A label of 1 classifies an email as spam, while a label of 0 classifies it as ham, or not spam.
+
+In order to train a model to predict whether an email is spam or ham, a Naive Bayes classification algorithm will be used to learn patterns in the text data from the Ling-Spam Dataset, and classify new emails based on those patterns. According to [IBM](https://www.ibm.com/think/topics/naive-bayes), the Naive Bayes classifier "seeks to model the distribution of inputs of a given class or category."
+
+```{r}
+#set seed to ensure reproducibility
+set.seed(304150)
+#use the tidymodels package to split the data into 80% used for training the model and 20% used for testing it
+split <- initial_split(emails, prop = 0.8)
+#80% training data
+train <- training(split)
+#20% testing data
+test <- testing(split)
+#combine subject and message columns
+train <- train %>%
+  mutate(full_text = paste(subject, message))
+test <- test %>%
+  mutate(full_text = paste(subject, message))
+```
+
+After splitting the data, the text has to be processed so that the model can learn from it. This teaches the model to predict whether an email is spam or ham from the text found in the dataset.
+
+```{r}
+rec <- recipe(label ~ full_text, data = train) %>%
+  #split the content in the subject and messages columns into individual words
+  step_tokenize(full_text) %>%
+  #limits to the top 500 words to keep the model from breaking
+  step_tokenfilter(full_text, max_tokens = 500) %>%
+  #assigns term frequency features to words 
+  step_tfidf(full_text)
+```
+
+Now, Naive Bayes can be implemented.
+
+```{r}
+model <- naive_Bayes() %>%
+  set_engine("naivebayes") %>%
+  set_mode("classification")
+```
+
+The model is now able to use Naive Bayes classifiers to learn from the data.
+
+```{r}
+#create a workflow (from tidymodels) 
+wf <- workflow() %>%
+  #add the recipe created above that tells the model how to learn from the text
+  add_recipe(rec) %>%
+  #add the model (Naive Bayes)
+  add_model(model)
+#train the wf using the data
+fit_model <- fit(wf, data = train)
+```
+
+The model can then be used to predict the classifications of the emails in the test dataset, as well as text it for accuracy.
+
+```{r}
+#create predictions
+predictions <- predict(fit_model, test) %>%
+  bind_cols(test)
+#test for accuracy
+accuracy(predictions, truth = label, estimate = .pred_class)
+```
+
+The accuracy test shows that the model is about 86 percent accurate in predicting an email to be either spam or ham.
+
+Another way to test the model for accuracy is to create a ham email similar to the ones in the Ling-Spam dataset in its own dataframe.
+
+```{r}
+fake_email <- data.frame(
+  subject = "Meeting",
+  message = "Calling all lingusts! We have our annual meeting at 3pm on Saturday."
+  )
+#combine subject and message
+fake_email <- fake_email %>%
+  mutate(full_text = paste(subject, message))
+# predict
+predict(fit_model, fake_email)
+```
+
+The model accurately predicted that this email was not spam, meaning that it would not end up in the recipient's spam folder.
+
+## Conclusion
+
+This project gave me a greater amount of insight into predictive modeling. I did encounter a couple of hurdles that I had to overcome while implementing the model. Firstly, while trying to train the workflow using the data, I got an error saying that the outcome of a classification vector should be a factor, not an integer vector. To fix this, I changed the data in the label column (either 0 or 1) to factors before splitting the data. The other issue I ran into was that the Naive Bayes classifier was not able to handle the many columns produced by TF-IDF. To fix this, I added the line step_tokenfilter(full_text, max_tokens = 500). However, this may have affected the accuracy of the model. To extend this work, one might try using different models, like logistic regression, and comparing their accuracy to that of the Naive Bayes classification algorithm.
+
+### References:
+
+[Creating a naïve Bayes spam filter in R](https://hohenfeld.is/posts/creating-a-naive-bayes-spam-filter-in-r/)
+
+[What are Naïve Bayes classifiers?](https://www.ibm.com/think/topics/naive-bayes)
+
+[Machine learning with tidymodels](https://juliasilge.github.io/tidymodels-tutorial/)
